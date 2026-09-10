@@ -2,7 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/bash-commander.sh"
+
+source "$SCRIPT_DIR/../bash-commander.sh"
 
 cli_create "defaultCommand" "Example using a default command"
 
@@ -17,7 +18,6 @@ port=""
 cli_get_option "port" port || true
 
 echo "CLI_SELECTED_COMMAND: $CLI_SELECTED_COMMAND"
-
 
 case "$CLI_SELECTED_COMMAND" in
   build)

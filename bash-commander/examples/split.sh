@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/bash-commander.sh"
+source "$SCRIPT_DIR/../bash-commander.sh"
 
 cli_create "split" "Split a string by separator"
 cli_option "--first" "return first chunk only"
@@ -24,6 +24,7 @@ input="${CLI_GLOBAL_ARGS[0]}"
 
 if [[ -z "$separator" ]]; then
   echo "separator is required (use -s or --separator)" >&2
+
   exit 1
 fi
 
