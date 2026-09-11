@@ -1,4 +1,4 @@
-source "$SCRIPT_DIR/repeat.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/repeat.sh"
 
 section() {
   local title="$1"
