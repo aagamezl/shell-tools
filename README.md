@@ -2,61 +2,29 @@
 
 A collection of lightweight shell-based tools for everyday development and system tasks. Built entirely with Bash to stay portable, minimal, and dependency-free.
 
-## create-host-config.sh
+## create-host-config
 
-Add a new Host entry to `~/.ssh/config` without overwriting existing entries. A timestamped backup is created first, then a new SSH key is generated for the host.
+Add one Host entry to `~/.ssh/config` without overwriting an existing alias. The script lists the aliases already in the file, asks for the new host, and shows the block it would append. After you confirm, it writes `~/.ssh/config.backup.<unix-timestamp>`, generates an ed25519 key in `~/.ssh` when that key is missing, adds the key to the agent, scans the server into `~/.ssh/known_hosts`, and appends the Host block.
 
-### Usage
-
+```bash
+./create-host-config/create-host-config.sh
+./create-host-config/create-host-config.sh --dry-run
+./create-host-config/create-host-config.sh --help
 ```
-create-host-config.sh
 
-Add a new Host entry to ~/.ssh/config without overwriting existing entries.
-A timestamped backup is created first, then a new SSH key is generated
-for the host.
+`--dry-run` (`-n`) prints the Host block that would be appended. It leaves the backup, the key, `known_hosts`, and `~/.ssh/config` untouched.
 
-Usage:
-  ./create-host-config.sh
-  ./create-host-config.sh -n
-  ./create-host-config.sh --dry-run
-  ./create-host-config.sh -h
-  ./create-host-config.sh --help
+Prompts, in order. Press Enter to accept the default.
 
-Options:
-  -n, --dry-run    Show the changes that would be made and exit
-                   without writing to ~/.ssh/config, creating a
-                   backup, or generating an SSH key
-  -h, --help       Show this usage guide and exit
+| Prompt | Default | Notes |
+| --- | --- | --- |
+| Host name |  | Alias used as `ssh <alias>`. Starts with a letter or digit, then letters, digits, and `. _ @ + -`. |
+| HostName | `github.com`, `gitlab.com`, or `bitbucket.org` when the alias is that name or that host; otherwise the alias | Server name or IP. |
+| User | `git` | |
+| Port | `22` | Omitted from the block when it is 22. |
+| IdentityFile | `~/.ssh/id_ed25519_<Host name>` | Only the file name is kept. The key is always created in `~/.ssh`. The name is the private key: not a `.pub` file, and not `config`, `known_hosts`, `authorized_keys`, or `environment` in any case. |
+| IdentitiesOnly | `yes` | `yes` or `no`. |
 
-What the script does:
-  1. Lists existing Host entries in ~/.ssh/config
-  2. Prompts for the new host information
-  3. Refuses to continue if that Host alias already exists
-  4. Copies ~/.ssh/config to ~/.ssh/config.backup.<timestamp>
-     where <timestamp> is a Unix timestamp (seconds since epoch)
-  5. Generates an ed25519 SSH key in ~/.ssh
-     (existing keys are left unchanged)
-  6. Adds the private key to the SSH agent (ssh-add)
-  7. Adds the provider host key to ~/.ssh/known_hosts
-     if it is not already present (ssh-keyscan)
-  8. Appends the new Host block to ~/.ssh/config
+The new block also sets `AddKeysToAgent yes`. On macOS it sets `IgnoreUnknown UseKeychain` and `UseKeychain yes`, and `ssh-add` tries the Apple keychain first. An existing private key and its `.pub` file are left unchanged and still added to the agent. A partial pair (only one of the two files) stops the script before anything is written. `Include` files are not scanned. A `Host` pattern that contains `*`, `?`, `!`, or `[` is listed and reported as a pattern that may also match. The script says so when it sees either case.
 
-Prompts:
-  Host name        SSH alias used as: ssh <Host name>
-  HostName         Real hostname (github.com, gitlab.com,
-                   bitbucket.org, ...)
-  User             SSH user (default: git)
-  IdentityFile     Key file name or path; the key is always
-                   created in ~/.ssh (default:
-                   ~/.ssh/id_ed25519_<Host name>)
-  IdentitiesOnly   yes or no (default: yes)
-
-Messages:
-  Success and error messages are printed for the backup and for
-  the new host config entry.
-
-Examples:
-  ./create-host-config.sh
-  ./create-host-config.sh --dry-run
-  ./create-host-config.sh --help
-```
+A real run needs a terminal, because `ssh-keygen` asks for a passphrase. After the plan it asks you to confirm. If the agent is not running, or the server scan fails, the Host block is still written and the result names the step to finish by hand. The public key is printed at the end.
