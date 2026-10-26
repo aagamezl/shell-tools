@@ -11,11 +11,9 @@ Scripts that source it:
 | Script | What the boxes show |
 | --- | --- |
 | `workdays.sh` | Banner, usage, month parameters, calendar, and a green or red result |
-| `copy-zsh-config.sh` | Usage, numbered export and install steps, and a result |
-| `copy-zsh-config-original.sh` | Same layout as `copy-zsh-config.sh` |
+| `zsh-config.sh` | Usage, numbered export and install steps, and a result |
 | `create-host-config/create-host-config.sh` | Banner, usage, existing hosts, the planned Host block, and a green or red result |
-
-`rebase-push/rebase-push.sh` keeps its own copy of the same functions inline.
+| `rebase-push/rebase-push.sh` | Banner, usage, parameters, preflight, each Git command, and a green or red result |
 
 ## Variables
 
@@ -104,6 +102,14 @@ Splits `<text>` on newlines and prints each line with `box_row`. A non-empty lin
 
 This is the function for command output that already contains newlines, such as a Git status block inside a progress section.
 
+### `box_run <label> <command> [arg...]`
+
+Runs `<command>` and draws it inside the open section. Call it after `section_open`. The borders use `BORDER`.
+
+The label is one cyan row, prefixed with `› `. The command's stdout and stderr are combined. Carriage returns become newlines, so a progress bar cannot overwrite the left border. That text is printed with `box_lines` in dim. Empty output prints nothing.
+
+The function returns the command's exit status. It does not exit the shell. A non-zero status is the caller's signal to print a Result and stop. `rebase-push` uses this for each `git` step.
+
 ### `section_open <title> <border>`
 
 Opens one rounded section. If `SECTION_OPEN` is already `1`, it calls `section_close` first, so two sections never share a frame. Then it stores `<border>` in `BORDER`, prints `box_top`, and sets `SECTION_OPEN` to `1`.
@@ -160,6 +166,27 @@ choose_box_width "${BOX_UI_WIDTH:-68}"
 ```
 
 `workdays.sh` calls `choose_box_width 100` once, at the start of `main`, before the banner. The calendar needs that wider box so seven weekday columns still have room for a full name.
+
+### `choose_box_width_for <min> [text...]`
+
+Sets `WIDTH` so every `<text>` fits as a section title, then applies a terminal cap.
+
+`<min>` is the floor. It defaults to `68` when the function is called with no arguments. Pass it whenever texts follow, because the first argument is always the floor. Each text needs six extra columns, which is what `box_top` keeps outside the title so the corner still closes. The preferred width is the larger of `<min>` and the largest `length + 6`.
+
+When standard output is a terminal, the function reads the column count the same way `choose_box_width` does, on file descriptor 3, and subtracts one. If the preferred width is larger, `WIDTH` becomes the smaller value, even when that is below `<min>`. If `stty` does not return a column count, the screen is treated as 80 columns and one is still subtracted, so the cap is 79.
+
+When standard output is not a terminal, `WIDTH` stays at `<min>`. Long text wraps or is truncated. A pipe does not grow the box.
+
+`choose_box_width` only shrinks a preferred width, and a failed measurement leaves that width unchanged. `choose_box_width_for` can grow past the floor on a terminal, and a failed measurement caps the box at 79.
+
+`rebase-push` calls this once it knows the branch and the base, passing the section titles and the parameter rows that should stay on one line. Help and usage errors are printed before that call, at the default width of 68.
+
+```bash
+choose_box_width_for 68 \
+  "3 · Update ${BASE}" \
+  "5 · Push ${BRANCH}" \
+  "Branch       ${BRANCH}"
+```
 
 ### `box_vis_row <visible> <colored>`
 
@@ -254,12 +281,14 @@ Color is also cleared when stdout is not a terminal at source time. Piping or re
 | `box_row` | `text` color, `text`, `border` color |
 | `box_blank` | `border` color |
 | `box_lines` | `text` color, `text` (may contain newlines), `border` color |
+| `box_run` | label, then the command and its arguments |
 | `section_open` | `title`, `border` color |
 | `section_close` | none |
 | `finish` | exit `code`, `border` color, `title`, then zero or more text lines |
 | `banner_row` | `text` color, `text` |
 | `box_banner` | `title`, `subtitle` (pass `""` to omit the subtitle) |
 | `choose_box_width` | optional preferred width (default `68`) |
+| `choose_box_width_for` | floor width, then the strings that must fit as titles |
 | `box_vis_row` | visible column count, colored text |
 | `box_center_row` | colored text, visible column count |
 | `table_cell` | cell width, opening ANSI color (or `""`), text |
@@ -325,7 +354,7 @@ A title that does not fit ends with `…` and still closes the corner:
 ╭─ This title is far too long to fit inside a sixty-eight column… ─╮
 ```
 
-`finish` writes the same rounded box, then terminates the process. The exit status is the code passed in. A failure from `copy-zsh-config.sh` looks like this and exits `1`:
+`finish` writes the same rounded box, then terminates the process. The exit status is the code passed in. A failure from `zsh-config.sh` looks like this and exits `1`:
 
 ```text
 ╭─ Result ─────────────────────────────────────────────────────────╮
@@ -369,11 +398,11 @@ box_banner "workdays" "Contractor workday calculator."
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 ```
 
-Pass `""` as the subtitle when the script name is enough. That second row is omitted. `rebase-push` uses that form for the same banner shape.
+Pass `""` as the subtitle when the script name is enough. That second row is omitted. `rebase-push` passes `Update a base branch, rebase onto it, then push.` as the subtitle.
 
 ### Usage and help
 
-Help is a yellow section: a bold synopsis, a blank row, then the rules and the flags. `workdays.sh` and both copy-zsh-config scripts use this when `--help` is passed, and `workdays.sh` prints it again when the month is missing, just before a red result.
+Help is a yellow section: a bold synopsis, a blank row, then the rules and the flags. `workdays.sh` and both zsh-config scripts use this when `--help` is passed, and `workdays.sh` prints it again when the month is missing, just before a red result.
 
 ```bash
 section_open "Usage" "$C_YELLOW"
@@ -395,11 +424,11 @@ section_close
 ╰──────────────────────────────────────────────────────────────────╯
 ```
 
-`copy-zsh-config.sh` fills the same frame with the export and install synopses, a dim paragraph for each mode, another blank row, and one row per flag (`-d`, `-a`, `-n`, `-f`, `-h`). The blank rows are `box_blank "$BORDER"`. The dim rows are the explanation, indented inside the text so they sit under the synopsis.
+`zsh-config.sh` fills the same frame with the export and install synopses, a dim paragraph for each mode, another blank row, and one row per flag (`-d`, `-a`, `-n`, `-f`, `-h`). The blank rows are `box_blank "$BORDER"`. The dim rows are the explanation, indented inside the text so they sit under the synopsis.
 
 ### Parameters and numbered steps
 
-Export and install print one blue section for the resolved arguments, then a cyan section per step. The label column is spaces inside the text, so the values share a column. `copy-zsh-config.sh` does this for "1 · Parameters" through "7 · Compress". `workdays.sh` does it for "1 · Month", "2 · Summary", and "3 · <Month> <Year>".
+Export and install print one blue section for the resolved arguments, then a cyan section per step. The label column is spaces inside the text, so the values share a column. `zsh-config.sh` does this for "1 · Parameters" through "7 · Compress". `workdays.sh` does it for "1 · Month", "2 · Summary", and "3 · <Month> <Year>".
 
 ```bash
 section_open "1 · Parameters" "$C_BLUE"
@@ -452,7 +481,7 @@ section_close
 
 ### Success and failure results
 
-`finish` is the last thing a script prints. It closes whatever section is still open, draws a Result box, and exits. `copy-zsh-config.sh` uses exit `0` after a completed export, and a non-zero code for usage errors, a missing archive, or a missing package manager. `workdays.sh` sends failures through `die`, which is `finish` with a red Result border.
+`finish` is the last thing a script prints. It closes whatever section is still open, draws a Result box, and exits. `zsh-config.sh` uses exit `0` after a completed export, and a non-zero code for usage errors, a missing archive, or a missing package manager. `workdays.sh` sends failures through `die`, which is `finish` with a red Result border.
 
 Success, two lines, exit `0`:
 

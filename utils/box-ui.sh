@@ -1,4 +1,4 @@
-# Box-drawn terminal UI (same style as rebase-push).
+# Box-drawn terminal UI. Sourced by callers such as rebase-push.
 
 WIDTH="${BOX_UI_WIDTH:-68}"
 SECTION_OPEN=0
@@ -129,6 +129,25 @@ box_lines() {
   done < <(printf '%s\n' "$text")
 }
 
+# Run a command and draw it inside the open section.
+# The label is a cyan row prefixed with ›. Remaining arguments are the
+# command. Combined stdout and stderr are indented in dim. Carriage
+# returns become newlines so a progress bar cannot overwrite the border.
+# Returns the command's status and does not exit the shell.
+box_run() {
+  local label="$1"
+  shift
+  local output
+  local code
+
+  box_row "$C_CYAN" "› $label" "$BORDER"
+  output=$("$@" 2>&1)
+  code=$?
+  output="${output//$'\r'/$'\n'}"
+  box_lines "$C_DIM" "$output" "$BORDER"
+  return "$code"
+}
+
 section_open() {
   local title="$1"
   local border="$2"
@@ -206,6 +225,51 @@ choose_box_width() {
       fi
     fi
   fi
+  WIDTH=$needed
+}
+
+# Set WIDTH so each string fits as a section title, then cap it.
+# The first argument is the floor (default 68). Each later argument is
+# text that must fit in box_top, which reserves 6 columns around the title.
+# On a terminal, WIDTH shrinks to one column short of the screen, even
+# below the floor. If stty cannot report the width, the screen is treated
+# as 80 columns and one is still subtracted. Off a terminal, WIDTH stays
+# at the floor so a pipe does not grow.
+choose_box_width_for() {
+  local min=68
+  local text
+  local len
+  local needed
+  local cols
+
+  if [[ $# -gt 0 ]]; then
+    min="$1"
+    shift
+  fi
+  needed=$min
+
+  for text in "$@"; do
+    len=$((${#text} + 6))
+    if (( len > needed )); then
+      needed=$len
+    fi
+  done
+
+  if [[ -t 1 ]]; then
+    exec 3>&1
+    cols=$(stty size <&3 2>/dev/null | awk '{print $2}')
+    exec 3>&-
+    if [[ ! "$cols" =~ ^[0-9]+$ ]] || (( cols < 2 )); then
+      cols=80
+    fi
+    cols=$((cols - 1))
+    if (( needed > cols )); then
+      needed=$cols
+    fi
+  elif (( needed > min )); then
+    needed=$min
+  fi
+
   WIDTH=$needed
 }
 
