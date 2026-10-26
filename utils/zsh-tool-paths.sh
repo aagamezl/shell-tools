@@ -1,185 +1,67 @@
-# Discover zsh tool locations and rewrite config paths for the target distro.
-# Sourced by copy-zsh-config.sh (requires bash 4+ for namerefs).
+# shellcheck shell=bash
+# Path map for zsh-config.sh.
+# Bash 3.2 compatible: no associative arrays and no namerefs.
+# Sourced by zsh-config.sh. Do not execute directly.
 
-# Logical keys written to tool-paths.source.tsv / resolved on install.
-readonly -a ZSH_TOOL_KEYS=(
-  OMZ_ROOT
-  AUTOSUGGESTIONS
-  SYNTAX_HIGHLIGHTING
-  HISTORY_SUBSTRING
-  COMPLETIONS_DIR
-  POWERLEVEL10K
-  CACHYOS_ZSH_CONFIG
-)
+# One directory under ~/.local holds this setup. Change the name to move
+# both the configuration and the cloned tools together.
+ZSH_CONFIG_NAME="zsh-config"
+ZSH_ROOT_REL=".local/${ZSH_CONFIG_NAME}"
+ZSH_CONFIG_REL="${ZSH_ROOT_REL}/config"
+ZSH_TOOLS_REL="${ZSH_ROOT_REL}/tools"
+ZSH_CONFIG_MARKER="zsh-config"
 
-tool_pkg_for_manager() {
-  local key="$1"
-  local mgr="$2"
-  case "$mgr" in
-    pacman)
-      case "$key" in
-        OMZ_ROOT) printf '%s' oh-my-zsh-git ;;
-        AUTOSUGGESTIONS) printf '%s' zsh-autosuggestions ;;
-        SYNTAX_HIGHLIGHTING) printf '%s' zsh-syntax-highlighting ;;
-        HISTORY_SUBSTRING) printf '%s' zsh-history-substring-search ;;
-        COMPLETIONS_DIR) printf '%s' zsh-completions ;;
-        POWERLEVEL10K) printf '%s' zsh-theme-powerlevel10k ;;
-        CACHYOS_ZSH_CONFIG) printf '%s' cachyos-zsh-config ;;
-      esac
-      ;;
-    apt)
-      case "$key" in
-        AUTOSUGGESTIONS) printf '%s' zsh-autosuggestions ;;
-        SYNTAX_HIGHLIGHTING) printf '%s' zsh-syntax-highlighting ;;
-        *) printf '%s' "" ;;
-      esac
-      ;;
-    dnf | yum)
-      case "$key" in
-        AUTOSUGGESTIONS) printf '%s' zsh-autosuggestions ;;
-        SYNTAX_HIGHLIGHTING) printf '%s' zsh-syntax-highlighting ;;
-        *) printf '%s' "" ;;
-      esac
-      ;;
-    zypper)
-      case "$key" in
-        AUTOSUGGESTIONS) printf '%s' zsh-autosuggestions ;;
-        SYNTAX_HIGHLIGHTING) printf '%s' zsh-syntax-highlighting ;;
-        *) printf '%s' "" ;;
-      esac
-      ;;
-    *)
-      printf '%s' ""
-      ;;
-  esac
+# Literal $HOME/.local/<name> written into files that zsh will source.
+zsh_root_ref() {
+  printf '%s\n' "\$HOME/${ZSH_ROOT_REL}"
 }
 
-_pacman_pkg_match() {
-  local pkg="$1"
-  local pattern="$2"
-  local line
-
-  [[ -n "$pkg" ]] || return 1
-  command -v pacman > /dev/null 2>&1 || return 1
-  pacman -Qq "$pkg" > /dev/null 2>&1 || return 1
-  line="$(pacman -Qlq "$pkg" 2>/dev/null | grep -E "$pattern" | head -n1 || true)"
-  [[ -n "$line" ]] && printf '%s\n' "$line"
+# Longest CachyOS paths first so a directory prefix cannot eat a longer path.
+zsh_tool_keys() {
+  printf '%s\n' \
+    POWERLEVEL10K \
+    SYNTAX_HIGHLIGHTING \
+    AUTOSUGGESTIONS \
+    HISTORY_SUBSTRING \
+    COMPLETIONS_DIR \
+    OMZ_ROOT \
+    CACHYOS_ZSH_CONFIG
 }
 
-_dpkg_pkg_match() {
-  local pkg="$1"
-  local pattern="$2"
-  local line
-
-  [[ -n "$pkg" ]] || return 1
-  command -v dpkg-query > /dev/null 2>&1 || return 1
-  dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed" || return 1
-  line="$(dpkg-query -L "$pkg" 2>/dev/null | grep -E "$pattern" | head -n1 || true)"
-  [[ -n "$line" ]] && printf '%s\n' "$line"
+# Keys cloned from upstream. CachyOS config is copied from the bundle, not cloned.
+clone_tool_keys() {
+  printf '%s\n' \
+    OMZ_ROOT \
+    SYNTAX_HIGHLIGHTING \
+    AUTOSUGGESTIONS \
+    COMPLETIONS_DIR \
+    HISTORY_SUBSTRING \
+    POWERLEVEL10K
 }
 
-_rpm_pkg_match() {
-  local pkg="$1"
-  local pattern="$2"
-  local line
-
-  [[ -n "$pkg" ]] || return 1
-  rpm -q "$pkg" > /dev/null 2>&1 || return 1
-  line="$(rpm -ql "$pkg" 2>/dev/null | grep -E "$pattern" | head -n1 || true)"
-  [[ -n "$line" ]] && printf '%s\n' "$line"
-}
-
-_pkg_match() {
-  local mgr="$1"
-  local pkg="$2"
-  local pattern="$3"
-
-  case "$mgr" in
-    pacman) _pacman_pkg_match "$pkg" "$pattern" ;;
-    apt) _dpkg_pkg_match "$pkg" "$pattern" ;;
-    dnf | yum | zypper) _rpm_pkg_match "$pkg" "$pattern" ;;
-    *) return 1 ;;
-  esac
-}
-
-_first_existing() {
-  local candidate
-  for candidate in "$@"; do
-    if [[ -e "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-  return 1
-}
-
-discover_tool_path() {
-  local key="$1"
-  local mgr="$2"
-  local pkg path dir
-
-  pkg="$(tool_pkg_for_manager "$key" "$mgr")"
-
-  case "$key" in
+# Strings as they appear in CachyOS cachyos-config.zsh and the sample bundle.
+default_source_path() {
+  case "$1" in
     OMZ_ROOT)
-      path="$(_pkg_match "$mgr" "$pkg" '/oh-my-zsh\.sh$' || true)"
-      if [[ -n "$path" ]]; then
-        dirname "$path"
-        return 0
-      fi
-      _first_existing \
-        /usr/share/oh-my-zsh \
-        /usr/local/share/oh-my-zsh \
-        "${HOME}/.oh-my-zsh"
+      printf '%s\n' /usr/share/oh-my-zsh
       ;;
     AUTOSUGGESTIONS)
-      path="$(_pkg_match "$mgr" "$pkg" 'zsh-autosuggestions\.zsh$' || true)"
-      [[ -n "$path" ]] && printf '%s\n' "$path" && return 0
-      _first_existing \
-        /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh \
-        /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh \
-        /usr/share/zsh/vendor-completions/zsh-autosuggestions.zsh
+      printf '%s\n' /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
       ;;
     SYNTAX_HIGHLIGHTING)
-      path="$(_pkg_match "$mgr" "$pkg" 'zsh-syntax-highlighting\.zsh$' || true)"
-      [[ -n "$path" ]] && printf '%s\n' "$path" && return 0
-      _first_existing \
-        /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh \
-        /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+      printf '%s\n' /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
       ;;
     HISTORY_SUBSTRING)
-      path="$(_pkg_match "$mgr" "$pkg" 'zsh-history-substring-search\.zsh$' || true)"
-      [[ -n "$path" ]] && printf '%s\n' "$path" && return 0
-      _first_existing \
-        /usr/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh \
-        /usr/share/zsh-history-substring-search/zsh-history-substring-search.zsh
+      printf '%s\n' /usr/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh
       ;;
     COMPLETIONS_DIR)
-      path="$(_pkg_match "$mgr" "$pkg" '/Completion/.*\.zsh$' || true)"
-      if [[ -n "$path" ]]; then
-        dirname "$(dirname "$path")"
-        return 0
-      fi
-      _first_existing /usr/share/zsh/plugins/zsh-completions /usr/share/zsh-completions
+      printf '%s\n' /usr/share/zsh/site-functions
       ;;
     POWERLEVEL10K)
-      path="$(_pkg_match "$mgr" "$pkg" 'powerlevel10k\.zsh-theme$' || true)"
-      [[ -n "$path" ]] && dirname "$path" && return 0
-      _first_existing \
-        /usr/share/zsh-theme-powerlevel10k \
-        /usr/share/zsh/themes/powerlevel10k
+      printf '%s\n' /usr/share/zsh-theme-powerlevel10k
       ;;
     CACHYOS_ZSH_CONFIG)
-      path="$(_pkg_match "$mgr" "$pkg" '(cachyos|/etc/zsh/)' || true)"
-      if [[ -n "$path" ]]; then
-        if [[ -d "$path" ]]; then
-          printf '%s\n' "$path"
-        else
-          dirname "$path"
-        fi
-        return 0
-      fi
-      _first_existing /usr/share/cachyos-zsh-config /etc/cachyos-zsh
+      printf '%s\n' /usr/share/cachyos-zsh-config
       ;;
     *)
       return 1
@@ -187,123 +69,228 @@ discover_tool_path() {
   esac
 }
 
-write_tool_paths_file() {
-  local outfile="$1"
-  local mgr="$2"
-  local key path
+# Text written into zsh files. $HOME is literal so the tree works for whoever owns it.
+zsh_file_path() {
+  local root
+  root="$(zsh_root_ref)"
 
-  : > "$outfile"
-  for key in "${ZSH_TOOL_KEYS[@]}"; do
-    path="$(discover_tool_path "$key" "$mgr" 2>/dev/null || true)"
-    if [[ -n "$path" ]]; then
-      printf '%s\t%s\n' "$key" "$path" >> "$outfile"
-    fi
-  done
+  case "$1" in
+    OMZ_ROOT)
+      printf '%s\n' "${root}/tools/oh-my-zsh"
+      ;;
+    AUTOSUGGESTIONS)
+      printf '%s\n' "${root}/tools/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+      ;;
+    SYNTAX_HIGHLIGHTING)
+      printf '%s\n' "${root}/tools/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+      ;;
+    HISTORY_SUBSTRING)
+      printf '%s\n' "${root}/tools/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh"
+      ;;
+    COMPLETIONS_DIR)
+      printf '%s\n' "${root}/tools/plugins/zsh-completions/src"
+      ;;
+    POWERLEVEL10K)
+      printf '%s\n' "${root}/tools/themes/powerlevel10k"
+      ;;
+    CACHYOS_ZSH_CONFIG)
+      printf '%s\n' "${root}/config"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
-load_tool_paths_tsv() {
-  local file="$1"
-  local -n _out="$2"
-  local key path
+# Directory created by git clone.
+tool_clone_dir() {
+  local home="$1"
+  local key="$2"
+  local root="${home}/${ZSH_TOOLS_REL}"
 
-  [[ -f "$file" ]] || return 1
-  while IFS=$'\t' read -r key path || [[ -n "${key:-}" ]]; do
-    [[ -z "${key:-}" || "$key" == key ]] && continue
-    _out["$key"]="$path"
-  done < "$file"
+  case "$key" in
+    OMZ_ROOT) printf '%s\n' "${root}/oh-my-zsh" ;;
+    AUTOSUGGESTIONS) printf '%s\n' "${root}/plugins/zsh-autosuggestions" ;;
+    SYNTAX_HIGHLIGHTING) printf '%s\n' "${root}/plugins/zsh-syntax-highlighting" ;;
+    HISTORY_SUBSTRING) printf '%s\n' "${root}/plugins/zsh-history-substring-search" ;;
+    COMPLETIONS_DIR) printf '%s\n' "${root}/plugins/zsh-completions" ;;
+    POWERLEVEL10K) printf '%s\n' "${root}/themes/powerlevel10k" ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
-# Fallback Arch/CachyOS paths when tool-paths.source.tsv is missing (old bundles).
-seed_source_paths() {
-  local -n _src="$1"
-  local key path
-
-  for key in "${ZSH_TOOL_KEYS[@]}"; do
-    [[ -n "${_src[$key]:-}" ]] && continue
-    path="$(discover_tool_path "$key" pacman 2>/dev/null || true)"
-    [[ -n "$path" ]] && _src["$key"]="$path"
-  done
+tool_git_url() {
+  case "$1" in
+    OMZ_ROOT) printf '%s\n' https://github.com/ohmyzsh/ohmyzsh.git ;;
+    AUTOSUGGESTIONS) printf '%s\n' https://github.com/zsh-users/zsh-autosuggestions.git ;;
+    SYNTAX_HIGHLIGHTING) printf '%s\n' https://github.com/zsh-users/zsh-syntax-highlighting.git ;;
+    HISTORY_SUBSTRING) printf '%s\n' https://github.com/zsh-users/zsh-history-substring-search.git ;;
+    COMPLETIONS_DIR) printf '%s\n' https://github.com/zsh-users/zsh-completions.git ;;
+    POWERLEVEL10K) printf '%s\n' https://github.com/romkatv/powerlevel10k.git ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
-build_path_replacement_pairs() {
-  local -n _src="$1"
-  local -n _tgt="$2"
-  local -n _pairs="$3"
-  local key from to
+tool_marker() {
+  local home="$1"
+  local key="$2"
+  local dir
+  dir="$(tool_clone_dir "$home" "$key")" || return 1
 
-  _pairs=()
-  for key in "${ZSH_TOOL_KEYS[@]}"; do
-    from="${_src[$key]:-}"
-    to="${_tgt[$key]:-}"
-    [[ -z "$from" || -z "$to" || "$from" == "$to" ]] && continue
-    _pairs+=("$from|$to")
-  done
+  case "$key" in
+    OMZ_ROOT) printf '%s\n' "${dir}/oh-my-zsh.sh" ;;
+    AUTOSUGGESTIONS) printf '%s\n' "${dir}/zsh-autosuggestions.zsh" ;;
+    SYNTAX_HIGHLIGHTING) printf '%s\n' "${dir}/zsh-syntax-highlighting.zsh" ;;
+    HISTORY_SUBSTRING) printf '%s\n' "${dir}/zsh-history-substring-search.zsh" ;;
+    COMPLETIONS_DIR) printf '%s\n' "${dir}/src" ;;
+    POWERLEVEL10K) printf '%s\n' "${dir}/powerlevel10k.zsh-theme" ;;
+    *)
+      return 1
+      ;;
+  esac
+}
 
-  # Longest source paths first to avoid partial replacements.
-  if ((${#_pairs[@]} > 1)); then
-    local IFS=$'\n'
-    _pairs=($(printf '%s\n' "${_pairs[@]}" | awk -F'|' '{ print length($1), $0 }' | sort -rn | cut -d' ' -f2-))
+tool_label() {
+  case "$1" in
+    OMZ_ROOT) printf '%s\n' oh-my-zsh ;;
+    AUTOSUGGESTIONS) printf '%s\n' zsh-autosuggestions ;;
+    SYNTAX_HIGHLIGHTING) printf '%s\n' zsh-syntax-highlighting ;;
+    HISTORY_SUBSTRING) printf '%s\n' zsh-history-substring-search ;;
+    COMPLETIONS_DIR) printf '%s\n' zsh-completions ;;
+    POWERLEVEL10K) printf '%s\n' powerlevel10k ;;
+    CACHYOS_ZSH_CONFIG) printf '%s\n' cachyos-zsh-config ;;
+    *)
+      printf '%s\n' "$1"
+      ;;
+  esac
+}
+
+source_path_for() {
+  local key="$1"
+  local paths_file="${2:-}"
+  local found=""
+
+  if [[ -n "$paths_file" && -f "$paths_file" ]]; then
+    found="$(awk -F '\t' -v k="$key" '$1 == k { print $2; exit }' "$paths_file")"
   fi
-}
-
-_paths_generated_content() {
-  local -n _tgt="$1"
-  local key
-
-  cat <<'EOF'
-# Generated by copy-zsh-config — do not edit manually.
-# >>> copy-zsh-config paths >>>
-EOF
-  for key in "${ZSH_TOOL_KEYS[@]}"; do
-    [[ -n "${_tgt[$key]:-}" ]] || continue
-    case "$key" in
-      OMZ_ROOT)
-        printf 'export ZSH=%q\n' "${_tgt[$key]}"
-        ;;
-      POWERLEVEL10K)
-        printf 'export POWERLEVEL10K_DIR=%q\n' "${_tgt[$key]}"
-        ;;
-      COMPLETIONS_DIR)
-        printf 'fpath=(%q $fpath)\n' "${_tgt[$key]}/src"
-        ;;
-      AUTOSUGGESTIONS | SYNTAX_HIGHLIGHTING | HISTORY_SUBSTRING)
-        printf '# %s: %q\n' "$key" "${_tgt[$key]}"
-        ;;
-      CACHYOS_ZSH_CONFIG)
-        printf '# %s: %q\n' "$key" "${_tgt[$key]}"
-        ;;
-    esac
-  done
-  printf '%s\n' '# <<< copy-zsh-config paths <<<'
-}
-
-_rewrite_file_paths() {
-  local file="$1"
-  local -n _pairs="$2"
-  local pair from to content
-
-  [[ -f "$file" ]] || return 0
-  if ! grep -Iq . "$file" 2>/dev/null; then
+  if [[ -n "$found" ]]; then
+    printf '%s\n' "$found"
     return 0
   fi
-
-  content="$(<"$file")"
-  for pair in "${_pairs[@]}"; do
-    from="${pair%%|*}"
-    to="${pair#*|}"
-    [[ -z "$from" || -z "$to" || "$from" == "$to" ]] && continue
-    content="${content//${from}/${to}}"
-  done
-  printf '%s' "$content" > "$file"
+  default_source_path "$key"
 }
 
-rewrite_config_tree_paths() {
-  local config_dir="$1"
-  local -n _pairs_ref="$2"
-  local file
+# True when the manifest path is a tool, license, or doc shipped by CachyOS.
+# Those files are never installed. The target gets a fresh upstream copy.
+is_bundled_tool_path() {
+  case "$1" in
+    *.zwc) return 0 ;;
+    /usr/share/oh-my-zsh | /usr/share/oh-my-zsh/*) return 0 ;;
+    /usr/share/zsh/plugins | /usr/share/zsh/plugins/*) return 0 ;;
+    /usr/share/zsh/site-functions | /usr/share/zsh/site-functions/*) return 0 ;;
+    /usr/share/zsh-theme-powerlevel10k | /usr/share/zsh-theme-powerlevel10k/*) return 0 ;;
+    /usr/share/doc | /usr/share/doc/*) return 0 ;;
+    /usr/share/licenses | /usr/share/licenses/*) return 0 ;;
+  esac
+  return 1
+}
 
-  [[ -d "$config_dir" ]] || return 0
-  while IFS= read -r -d '' file; do
-    _rewrite_file_paths "$file" _pairs_ref
-  done < <(find "$config_dir" -type f ! -name 'paths.generated.zsh' -print0 2>/dev/null)
+# CachyOS aliases such as make="make -j`nproc`" run the substitution while the
+# file is read. Single quotes run it when the alias is used, so a machine
+# without nproc or pacman can still start zsh.
+defer_startup_aliases() {
+  local line="$1"
+  local name value
+
+  if [[ "$line" =~ ^alias[[:space:]]+([A-Za-z0-9_]+)=\"(.*)\"[[:space:]]*$ ]]; then
+    name="${BASH_REMATCH[1]}"
+    value="${BASH_REMATCH[2]}"
+    if [[ "$value" != *"'"* && ( "$value" == *'$('* || "$value" == *'`'* ) ]]; then
+      printf "alias %s='%s'" "$name" "$value"
+      return 0
+    fi
+  fi
+  printf '%s' "$line"
+}
+
+# Quote a bare $HOME/... word so a home directory that contains spaces still sources.
+# Leave a path that is already inside double quotes alone.
+quote_bare_home_paths() {
+  local line="$1"
+  local out="" pre rest token
+
+  rest="$line"
+  while [[ "$rest" == *'$HOME/'* ]]; do
+    pre="${rest%%\$HOME/*}"
+    rest="${rest#"$pre"}"
+    if [[ "$rest" == *[[:space:]]* ]]; then
+      token="${rest%%[[:space:]]*}"
+    else
+      token="$rest"
+    fi
+    rest="${rest#"$token"}"
+    # A sentence period after a path is not part of the path.
+    local last
+    while true; do
+      last="${token#${token%?}}"
+      case "$last" in
+        '.' | ',' | ';' | ':')
+          rest="${last}${rest}"
+          token="${token%?}"
+          ;;
+        *) break ;;
+      esac
+    done
+    if [[ "$pre" == *'"' || "$token" == *'"'* ]]; then
+      out+="${pre}${token}"
+    else
+      out+="${pre}\"${token}\""
+    fi
+  done
+  printf '%s%s' "$out" "$rest"
+}
+
+rewrite_config_file() {
+  local file="$1"
+  local paths_file="$2"
+  local source_user="$3"
+  local source_home="$4"
+  local content key from to
+
+  [[ -f "$file" ]] || return 0
+  content="$(cat "$file")"
+
+  while IFS= read -r key; do
+    [[ -n "$key" ]] || continue
+    from="$(source_path_for "$key" "$paths_file")"
+    to="$(zsh_file_path "$key")"
+    [[ -z "$from" || -z "$to" || "$from" == "$to" ]] && continue
+    content="${content//${from}/${to}}"
+  done < <(zsh_tool_keys)
+
+  if [[ -n "$source_home" && "$source_home" != "$HOME" ]]; then
+    content="${content//${source_home}/${HOME}}"
+  elif [[ -n "$source_user" ]]; then
+    content="${content//\/home\/${source_user}/${HOME}}"
+    content="${content//\/Users\/${source_user}/${HOME}}"
+  fi
+
+  local needle='$HOME/.p10k.zsh'
+  local p10k_ref
+  p10k_ref="$(zsh_file_path CACHYOS_ZSH_CONFIG)/.p10k.zsh"
+  content="${content//${needle}/${p10k_ref}}"
+  needle='~/.p10k.zsh'
+  content="${content//${needle}/${p10k_ref}}"
+
+  local quoted="" line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="$(quote_bare_home_paths "$line")"
+    line="$(defer_startup_aliases "$line")"
+    quoted+="${line}"$'\n'
+  done <<< "$content"
+  printf '%s' "$quoted" > "$file"
 }
