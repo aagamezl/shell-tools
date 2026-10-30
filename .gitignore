@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Editors
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Tool output: zsh-config exports, profile backups, install backups
+*.tar.gz
+*.tgz
+*.backup.*
