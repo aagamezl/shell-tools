@@ -1,0 +1,24 @@
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #f4f1ea;
+  color: #1c1917;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+main {
+  text-align: center;
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: 3rem;
+  letter-spacing: -0.03em;
+}
+
+#status {
+  margin: 0;
+  color: #57534e;
+}
