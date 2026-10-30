@@ -31,6 +31,7 @@ TOOLS=(
   "profile-backup:profile-backup.sh"
   "http-server:http-server/http-server.sh"
   "bash-commander:bash-commander/bash-commander.sh"
+  "port-view:port-view.sh"
 )
 
 usage() {

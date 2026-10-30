@@ -48,6 +48,7 @@ Install and update make `~/.local/share/shell-tools` match GitHub `master`: the 
 ~/.local/bin/profile-backup -> ~/.local/share/shell-tools/profile-backup.sh
 ~/.local/bin/http-server -> ~/.local/share/shell-tools/http-server/http-server.sh
 ~/.local/bin/bash-commander -> ~/.local/share/shell-tools/bash-commander/bash-commander.sh
+~/.local/bin/port-view -> ~/.local/share/shell-tools/port-view.sh
 ```
 
 Open a new terminal after installing. The command name is the tool name, for example `workdays --help`.
@@ -66,6 +67,7 @@ Open a new terminal after installing. The command name is the tool name, for exa
 | `bpm` | Keep a local `package.bpm` manifest and dependency list. |
 | `http-server` | Serve a directory over HTTP. |
 | `bash-commander` | Bash 3.2 command-line parser library. Source it. |
+| `port-view` | List ports in use and stop the process holding one. |
 
 ## create-host-config
 
@@ -170,6 +172,17 @@ ROOT=http-server/public http-server
 ADDR=0.0.0.0 http-server
 ```
 
+## port-view
+
+List TCP listeners and bound UDP ports, then stop the process that holds one of them. The list fills the terminal. Arrow keys move the highlight, and Enter asks before sending `SIGTERM`. If the process stays up, the next screen offers `SIGKILL`. `r` refreshes, `/` filters, and `q` quits. `--all` includes established and connected sockets. `lsof` is required.
+
+```bash
+port-view
+port-view --all
+port-view --list --proto tcp --user "$USER"
+port-view --help
+```
+
 ## bash-commander
 
 Bash 3.2 parser for options, arguments, and subcommands. Source it, define the command, then call `cli_parse`. The description of the API is `bash-commander/BASH_COMMANDER.md` under the install directory. Examples are installed beside the library.
@@ -180,4 +193,4 @@ Bash 3.2 parser for options, arguments, and subcommands. Source it, define the c
 
 ## utils
 
-Shared helpers sourced by the other tools: terminal boxes, color, layout, and the zsh-config path map. They live in `~/.local/share/shell-tools/utils` with the rest of the repository. The helpers are not commands on `PATH`.
+Shared helpers sourced by the other tools: terminal boxes, prompts, color, layout, and the zsh-config path map. They live in `~/.local/share/shell-tools/utils` with the rest of the repository. The helpers are not commands on `PATH`.
