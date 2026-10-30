@@ -14,6 +14,7 @@ Scripts that source it:
 | `copy-zsh-config.sh` | Usage, numbered export and install steps, and a result |
 | `copy-zsh-config-original.sh` | Same layout as `copy-zsh-config.sh` |
 | `create-host-config/create-host-config.sh` | Banner, usage, existing hosts, the planned Host block, and a green or red result |
+| `install.sh` | Banner, usage, repository, linked commands, and a green or red result |
 
 `rebase-push/rebase-push.sh` keeps its own copy of the same functions inline.
 
@@ -141,7 +142,7 @@ Prints the heavy banner used at the start of a run, then a blank line:
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 ```
 
-The frame is cyan. The title is bold. An empty `<subtitle>` omits the second row. Both strings go through `banner_row`, so a long title or subtitle is truncated with `…`.
+The frame is cyan. The title is bold. An empty `<subtitle>` omits the second row. A newline in `<subtitle>` starts another row. Each line goes through `banner_row`, so a long title or subtitle line is truncated with `…`.
 
 `workdays.sh` calls this with the script name and `Contractor workday calculator.` before usage, before a usage error, and before the calendar.
 
