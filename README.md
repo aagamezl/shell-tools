@@ -4,52 +4,53 @@ A collection of lightweight shell-based tools for everyday development and syste
 
 ## Install
 
-`install.sh` copies the tools you name into `~/.local/shell-tools` and puts each command on `PATH`. `utils/` is installed with every selection. The tools source those files from next to their own scripts, so the installer keeps the repository layout under the install directory. The catalog of tool names is `tools_list` in `install.sh`.
+`git` is required. The tools are the GitHub `master` branch, checked out at `~/.local/share/shell-tools`, in the same layout as this repository. Each command is a symlink in `~/.local/bin`. Nothing is written to `/usr/local/bin`, and shell startup files are left unchanged. `~/.local/bin` needs to be on `PATH`.
+
+`boot.sh` is the entry point from GitHub. It clones `master` into `~/.local/share/shell-tools` when `install.sh` is not there yet. If that path already exists and does not contain `install.sh`, `boot.sh` stops instead of replacing it. It then runs `install.sh` from the checkout and passes its arguments through.
 
 ```bash
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/aagamezl/shell-tools/master/install.sh)" -- --help
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/aagamezl/shell-tools/master/install.sh)" -- --all
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/aagamezl/shell-tools/master/install.sh)" -- workdays
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/aagamezl/shell-tools/master/install.sh)" -- --prefix ~/.local/shell-tools create-host-config
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/aagamezl/shell-tools/master/boot.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/aagamezl/shell-tools/master/boot.sh)" -- --all
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/aagamezl/shell-tools/master/boot.sh)" -- workdays
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/aagamezl/shell-tools/master/boot.sh)" -- --help
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/aagamezl/shell-tools/master/boot.sh)" -- --list
 ```
 
-The `--` after `sh -c` is required. The shell uses it as the command name, and everything after it is passed to `install.sh`.
+The `--` after `bash -c` is required when you pass arguments. The shell uses it as the command name, and everything after it is passed to `boot.sh`, which passes it to `install.sh`.
 
 From a checkout of this repository:
 
 ```bash
 ./install.sh --help
 ./install.sh --list
+./install.sh
 ./install.sh --all
 ./install.sh workdays
-./install.sh --prefix ~/.local/shell-tools bpm http-server
+./install.sh workdays http-server
+./install.sh --update
+./install.sh --uninstall
 ```
 
-`--prefix` (`-p`) changes the install directory. `SHELL_TOOLS_PREFIX` does the same when the flag is omitted. `--all` (`-a`) installs every tool in the catalog. Naming one or more tools installs only those, plus `utils/`. `--list` (`-l`) prints the catalog. `--ref` chooses the git branch downloaded by the GitHub command. A checkout installs the files next to `install.sh` and does not download them.
+`--help` (`-h`) prints usage. `--list` (`-l`) prints every tool and whether `~/.local/bin` already points into `~/.local/share/shell-tools`. Neither command clones or updates the checkout.
 
-Installed tree:
+With no arguments, or with `--all` (`-a`), `install.sh` links every tool. Naming one or more tools links only those commands and leaves the other links as they are. `--update` does the same after refreshing the checkout; with no names it links every tool.
+
+Install and update make `~/.local/share/shell-tools` match GitHub `master`: the directory is cloned when it is missing, and otherwise fetched and reset to `origin/master`. Files changed inside that directory are replaced by the GitHub tree. The checkout is the whole repository even when only one command is linked. If you run `install.sh` from any other directory, it updates that checkout first and continues with `~/.local/share/shell-tools/install.sh`.
+
+`--uninstall` removes each symlink in `~/.local/bin` that points into `~/.local/share/shell-tools`, then removes that directory. A command in `~/.local/bin` that is not one of those links is left in place.
 
 ```text
-~/.local/shell-tools/
-  bin/                 workdays, create-host-config, and the other command names
-  utils/               shared libraries sourced by the tools
-  workdays.sh
-  zsh-config.sh
-  create-host-config/create-host-config.sh
-  ...
+~/.local/bin/workdays -> ~/.local/share/shell-tools/workdays.sh
+~/.local/bin/create-host-config -> ~/.local/share/shell-tools/create-host-config/create-host-config.sh
+~/.local/bin/zsh-config -> ~/.local/share/shell-tools/zsh-config/zsh-config.sh
+~/.local/bin/list-recent-collaborators -> ~/.local/share/shell-tools/list-recent-collaborators.sh
+~/.local/bin/minify-code -> ~/.local/share/shell-tools/minify-code.sh
+~/.local/bin/profile-backup -> ~/.local/share/shell-tools/profile-backup.sh
+~/.local/bin/http-server -> ~/.local/share/shell-tools/http-server/http-server.sh
+~/.local/bin/bash-commander -> ~/.local/share/shell-tools/bash-commander/bash-commander.sh
 ```
 
-`bin/<name>` runs the real script, except `bash-commander`, which is a symlink so it can be sourced. When `/usr/local/bin` is writable, each command is linked there too. The installer also prepends the `bin` directory to `PATH` in `~/.zshenv`, `~/.zprofile`, `~/.zshrc`, `~/.bashrc`, and `~/.profile` (or `~/.bash_profile` when that file already exists):
-
-```sh
-# >>> shell-tools >>>
-export PATH="$HOME/.local/shell-tools/bin:$PATH"
-# <<< shell-tools <<<
-```
-
-Open a new terminal after installing. The command name is the catalog name, for example `workdays --help`. The `shell-tools` block uses its own markers, so it can sit in `~/.zshenv` next to the `zsh-config` block. If `zsh-config --uninstall` restores `~/.zshenv` from a backup taken before this block existed, run the installer again to put the block back.
-
-`--system-bin` chooses a different directory for those links. `SHELL_TOOLS_SYSTEM_BIN` does the same when the flag is omitted.
+Open a new terminal after installing. The command name is the tool name, for example `workdays --help`.
 
 ## Tools
 
@@ -105,7 +106,7 @@ Set up zsh and oh-my-zsh from a CachyOS configuration bundle. The CachyOS files 
 ./zsh-config.sh --help
 ```
 
-`zsh-config/zsh-config-20261026-124356.tar.gz` is a full CachyOS copy you can install from. Install reads that archive. It does not read the extracted directory next to it. The installer uses its configuration files and ignores the bundled oh-my-zsh, plugins, and theme. The whole setup lives in `~/.local/zsh-config`: configuration in `config/`, cloned tools in `tools/`. `~/.zshenv` only sets `ZDOTDIR` to `~/.local/zsh-config/config`. That directory name is `ZSH_CONFIG_NAME` in `utils/zsh-tool-paths.sh`. The next zsh process follows that `ZDOTDIR`; the shell you are already in does not. `--uninstall` removes `~/.local/zsh-config` and puts `~/.zshenv` back. The startup sequence is in [Activation](zsh-config/README.md#activation). The layout, the path rewrite, and every file the installer creates are in [zsh-config/README.md](zsh-config/README.md). Installing this tool also copies the `zsh-config/` directory, including that sample archive when it is in the source tree, into the install directory.
+`zsh-config/zsh-config-20261026-124356.tar.gz` is a full CachyOS copy you can install from. Install reads that archive. It does not read the extracted directory next to it. The installer uses its configuration files and ignores the bundled oh-my-zsh, plugins, and theme. The whole setup lives in `~/.local/zsh-config`: configuration in `config/`, cloned tools in `tools/`. `~/.zshenv` only sets `ZDOTDIR` to `~/.local/zsh-config/config`. That directory name is `ZSH_CONFIG_NAME` in `utils/zsh-tool-paths.sh`. The next zsh process follows that `ZDOTDIR`; the shell you are already in does not. `--uninstall` removes `~/.local/zsh-config` and puts `~/.zshenv` back. The startup sequence is in [Activation](zsh-config/README.md#activation). The layout, the path rewrite, and every file the installer creates are in [zsh-config/README.md](zsh-config/README.md). That archive ships in the checkout at `~/.local/share/shell-tools/zsh-config/`.
 
 ## workdays
 
@@ -160,11 +161,13 @@ bpm search log
 
 ## http-server
 
-Serve the current directory, or the directory in `ROOT`, over HTTP. The optional argument is the port. The default port is `8080`. The sample page shipped with the tool is `http-server/public/index.html` under the install directory.
+Serve the current directory, or the directory in `ROOT`, over HTTP. The optional argument is the port. The default port is `8080`. The server listens on `127.0.0.1` and `::1`. Set `ADDR` to bind somewhere else, for example `ADDR=0.0.0.0`. The sample page shipped with the tool is `http-server/public/index.html` under the install directory.
 
 ```bash
 http-server
 http-server 3000
+ROOT=http-server/public http-server
+ADDR=0.0.0.0 http-server
 ```
 
 ## bash-commander
@@ -172,9 +175,9 @@ http-server 3000
 Bash 3.2 parser for options, arguments, and subcommands. Source it, define the command, then call `cli_parse`. The description of the API is `bash-commander/BASH_COMMANDER.md` under the install directory. Examples are installed beside the library.
 
 ```bash
-. ~/.local/shell-tools/bash-commander/bash-commander.sh
+. ~/.local/share/shell-tools/bash-commander/bash-commander.sh
 ```
 
 ## utils
 
-Shared helpers sourced by the other tools: terminal boxes, color, layout, and the zsh-config path map. `install.sh` always copies `utils/` into the install directory. The helpers are not commands on `PATH`.
+Shared helpers sourced by the other tools: terminal boxes, color, layout, and the zsh-config path map. They live in `~/.local/share/shell-tools/utils` with the rest of the repository. The helpers are not commands on `PATH`.

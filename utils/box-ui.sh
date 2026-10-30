@@ -181,12 +181,14 @@ banner_row() {
 box_banner() {
   local title="$1"
   local subtitle="$2"
-  local dashes
+  local dashes line
   dashes="$(repeat_char "━" $((WIDTH - 2)))"
   printf '%s┏%s┓%s\n' "$C_CYAN" "$dashes" "$C_RESET"
   banner_row "$C_BOLD" "$title"
   if [[ -n "$subtitle" ]]; then
-    banner_row "" "$subtitle"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      banner_row "" "$line"
+    done <<< "$subtitle"
   fi
   printf '%s┗%s┛%s\n\n' "$C_CYAN" "$dashes" "$C_RESET"
 }
