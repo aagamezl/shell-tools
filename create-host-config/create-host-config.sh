@@ -5,7 +5,23 @@
 
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+resolve_script_dir() {
+  local script_path="${BASH_SOURCE[0]}"
+  local script_link
+
+  while [[ -L "$script_path" ]]; do
+    script_link="$(readlink "$script_path")"
+    if [[ "$script_link" == /* ]]; then
+      script_path="$script_link"
+    else
+      script_path="$(cd "$(dirname "$script_path")" && pwd)/${script_link}"
+    fi
+  done
+
+  cd "$(dirname "$script_path")" && pwd
+}
+
+SCRIPT_DIR="$(resolve_script_dir)"
 BOX_UI="${SCRIPT_DIR}/../utils/box-ui.sh"
 if [[ ! -f "$BOX_UI" ]]; then
   printf 'Missing %s\n' "$BOX_UI" >&2
